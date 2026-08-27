@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Portable launcher for the installed or checkout Hermes Vault package."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import sys
+
+
+def _add_candidates() -> None:
+    candidates = []
+    configured_home = os.environ.get("HERMES_HOME")
+    if configured_home:
+        candidates.append(Path(configured_home).expanduser() / "plugins")
+    candidates.append(Path.home() / ".hermes" / "plugins")
+    candidates.append(Path(__file__).resolve().parents[1] / "plugin")
+    for candidate in candidates:
+        if candidate.is_dir() and str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+
+
+_add_candidates()
+from hermes_vault.cli import main  # noqa: E402
+
+
+raise SystemExit(main())

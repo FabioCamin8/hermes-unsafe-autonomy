@@ -1,0 +1,43 @@
+# This repository is documentation and source only. Runtime state stays in the
+# active Hermes profile and must never enter Git.
+.env
+.env.*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+vault/
+backups/
+logs/
+runtime/
+auth.json
+auth.lock
+cookies
+cookies.sqlite*
+browser-profile/
+chromium-profile/
+private-key*
+*.pem
+*.key
+*.token
+*.secret
+*.credentials
+*.cookie
+*.session
+*.jsonl
+!tests/fixtures/*.jsonl
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.coverage
+coverage.xml
+dist/
+build/
+*.egg-info/
+
+# Local evidence and temporary exports.
+docs/RAW-*
+docs/*-private*
+*.log

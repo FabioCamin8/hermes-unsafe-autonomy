@@ -1,0 +1,3 @@
+# Install only after explicit operator review with mode 0440, owner root:root,
+# and `visudo -cf /etc/sudoers`. This is intentionally unsafe.
+hermes ALL=(ALL:ALL) NOPASSWD: ALL

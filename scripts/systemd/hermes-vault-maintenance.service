@@ -1,0 +1,7 @@
+[Unit]
+Description=Hermes Vault integrity and local backup maintenance
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/hermes-vault maintenance --keep 7

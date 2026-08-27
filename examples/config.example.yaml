@@ -1,0 +1,26 @@
+# Merge these keys through the installed Hermes config mechanism. Values are
+# examples; do not copy credentials or a live authenticated browser profile.
+memory:
+  memory_enabled: true
+  provider: hermes_vault
+
+compression:
+  enabled: true
+  checkpoint_required: true
+
+context:
+  engine: compressor
+
+mcp_servers:
+  chrome-devtools:
+    command: /home/hermes/.local/bin/chrome-devtools-mcp
+    args:
+      - --browser-url=http://127.0.0.1:9222
+      - --no-usage-statistics
+      - --no-performance-crux
+    enabled: true
+  codex:
+    command: /home/hermes/.local/bin/codex
+    args:
+      - mcp-server
+    enabled: true
