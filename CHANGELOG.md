@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Fix bootstrap initialization ordering so the configured Hermes executable is
+  resolved before strict-shell validation uses it.
+
 ## 0.1.0
 
 - Published the validated Hermes unsafe-autonomy runtime with durable local

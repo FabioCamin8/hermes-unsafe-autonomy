@@ -52,7 +52,6 @@ done
 [[ $EUID -eq 0 ]] || die 'run as root'
 [[ $unsafe_root == true ]] || die 'refusing to install passwordless root without --enable-unsafe-root'
 [[ -d $repo_root/plugin/hermes_vault ]] || die "missing provider source under $repo_root"
-[[ -x $hermes_bin ]] || die "Hermes executable not found: $hermes_bin"
 getent passwd "$hermes_user" >/dev/null || die "user not found: $hermes_user"
 hermes_uid=$(id -u "$hermes_user")
 hermes_gid=$(id -g "$hermes_user")
@@ -60,6 +59,7 @@ hermes_user_home=$(getent passwd "$hermes_user" | cut -d: -f6)
 [[ -n $hermes_user_home && -d $hermes_user_home ]] || die "Hermes user home not found: $hermes_user_home"
 hermes_home=${HERMES_HOME:-$hermes_user_home/.hermes}
 hermes_bin=${HERMES_BIN:-$hermes_user_home/.local/bin/hermes}
+[[ -x $hermes_bin ]] || die "Hermes executable not found: $hermes_bin"
 [[ $cdp_port =~ ^[0-9]+$ ]] || die "invalid HERMES_CDP_PORT: $cdp_port"
 ((10#$cdp_port >= 1 && 10#$cdp_port <= 65535)) || die "invalid HERMES_CDP_PORT: $cdp_port"
 [[ -d $hermes_home ]] || die "Hermes home not found: $hermes_home"

@@ -1,6 +1,6 @@
 [project]
 name = "hermes-unsafe-autonomy"
-version = "0.1.0"
+version = "0.1.1"
 description = "A local, recoverable Hermes Agent autonomy reference substrate"
 requires-python = ">=3.11"
 dependencies = []
