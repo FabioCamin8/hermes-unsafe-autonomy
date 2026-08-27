@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Retry the Codex MCP health probe within a bounded window to absorb transient
+  startup races during first bootstrap validation.
+
 ## 0.1.1
 
 - Fix bootstrap initialization ordering so the configured Hermes executable is

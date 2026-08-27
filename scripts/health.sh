@@ -41,6 +41,17 @@ print_status() {
   printf '%-28s %s\n' "$1:" "$2"
 }
 
+probe_with_retry() {
+  local attempt
+  for attempt in 1 2 3; do
+    if "$@"; then
+      return 0
+    fi
+    (( attempt < 3 )) && sleep 1
+  done
+  return 1
+}
+
 gateway=FAIL
 if systemctl --user is-active --quiet hermes-gateway.service 2>/dev/null; then
   gateway=OK
@@ -104,7 +115,7 @@ fi
 
 codex_mcp=FAIL
 if [[ -x $probe && -x $codex_command ]] && \
-  "$probe" "$codex_command" --timeout 60 -- mcp-server >/dev/null 2>&1; then
+  probe_with_retry "$probe" "$codex_command" --timeout 60 -- mcp-server >/dev/null 2>&1; then
   codex_mcp=OK
 fi
 
