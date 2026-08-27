@@ -19,7 +19,7 @@ and authenticated account details.
 | Gate | Status | Safe evidence |
 | --- | --- | --- |
 | Pre-change backup | PASS | Private pre-autonomy and rehearsal backups used SQLite backup API; integrity checks passed. |
-| Local provider tests | PASS | 17 tests passed, 0 failed, 0 skipped. |
+| Local provider tests | PASS | 19 tests passed, 0 failed, 0 skipped. |
 | Public-tree policy | PASS | Final local public-tree scan passed; no GitHub push. |
 | Bootstrap | PASS | Final bootstrap passed with pinned Chrome MCP `1.8.0`, Codex `0.150.1`, and default Codex protocol probe pass. |
 | User/root boundary | PASS | `hermes` passwordless root check returned `0`; gateway remained an enabled user unit under `hermes`. |

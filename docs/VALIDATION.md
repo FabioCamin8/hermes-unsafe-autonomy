@@ -17,7 +17,7 @@ scripts/validate-public-tree.sh
 The unit tests cover schema migration/integrity, FTS ranking, supersession,
 provenance, trust clamping, redaction in every materialization, journaling,
 checkpoint idempotency/filtering, forgetting, lifecycle hooks, and structured
-provider errors. The current suite has 17 tests.
+provider errors. The current suite has 19 tests.
 
 ### Fail-closed checkpoint test
 
