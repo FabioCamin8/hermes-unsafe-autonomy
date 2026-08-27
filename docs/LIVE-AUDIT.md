@@ -9,10 +9,10 @@ and authenticated account details.
 - Date: 2026-08-27
 - Target: authorized dedicated graphical Debian VM
 - Hermes boundary: user systemd gateway owned by `hermes`
-- Repository scope: local source and private VM only; no GitHub push
+- Repository scope: local source, private VM, and sanitized public publication
 - Browser profile: excluded from repository and project backups
 - Runtime acceptance: PASS; VM reboot recovery verified
-- Source/publication readiness: READY
+- Source/publication status: PUBLISHED; public refs verified after the final scans
 
 ## Evidence summary
 
@@ -20,7 +20,7 @@ and authenticated account details.
 | --- | --- | --- |
 | Pre-change backup | PASS | Private pre-autonomy and rehearsal backups used SQLite backup API; integrity checks passed. |
 | Local provider tests | PASS | 19 tests passed, 0 failed, 0 skipped. |
-| Public-tree policy | PASS | Final local public-tree scan passed; no GitHub push. |
+| Public-tree policy | PASS | Current-tree and history/archive publication scans passed before public push; remote refs were verified afterward. |
 | Bootstrap | PASS | Final bootstrap passed with pinned Chrome MCP `1.8.0`, Codex `0.150.1`, and default Codex protocol probe pass. |
 | User/root boundary | PASS | `hermes` passwordless root check returned `0`; gateway remained an enabled user unit under `hermes`. |
 | Vault discovery/recall | PASS | Live synthetic Session A/B acceptance recalled one exact marker automatically across distinct processes; sanitized evidence is preserved in `docs/evidence/cross-session-recall.md`. Supersession, provenance, redaction, untrusted clamping, checkpoint filtering/idempotency, and soft-forget remain covered by the local/provider checks. |

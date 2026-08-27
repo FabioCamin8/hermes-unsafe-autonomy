@@ -12,6 +12,7 @@ From the repository root:
 bash -n bootstrap.sh scripts/*.sh
 python3 -m unittest discover -s tests -v
 scripts/validate-public-tree.sh
+scripts/validate-public-history.sh
 ```
 
 The unit tests cover schema migration/integrity, FTS ranking, supersession,

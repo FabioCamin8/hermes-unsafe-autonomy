@@ -119,14 +119,22 @@ Local source validation is:
 
 ```bash
 scripts/validate.sh
+scripts/validate-public-tree.sh
+scripts/validate-public-history.sh
 ```
 
 After bootstrap, the live gates are described in
 [docs/VALIDATION.md](docs/VALIDATION.md) and recorded in
-[docs/LIVE-AUDIT.md](docs/LIVE-AUDIT.md). The public-tree scan must pass before
-anything is committed. This runtime layer is released independently from the
-companion [hermes-unsafe-vm](https://github.com/FabioCamin8/hermes-unsafe-vm)
-provisioner, which installs a pinned release rather than copying this source.
+[docs/LIVE-AUDIT.md](docs/LIVE-AUDIT.md). The public-tree and public-history
+scans must pass before anything is committed. This runtime layer is released
+independently from the companion
+[hermes-unsafe-vm](https://github.com/FabioCamin8/hermes-unsafe-vm) provisioner,
+which installs a pinned release rather than copying this source.
+
+Initial v0.1.x Git metadata was canonicalized shortly after publication to
+replace machine-generated author and tag identities with the project's GitHub
+noreply identity. Source functionality and release intent were preserved; the
+correction was a one-time initial-publication cleanup.
 
 ## Documentation map
 

@@ -14,6 +14,11 @@ repository.
 - [ ] No API keys, tokens, credentials, SSH private keys, or live backups are
   tracked.
 - [ ] `scripts/validate-public-tree.sh` reports `PUBLIC_TREE_SCAN=PASS`.
+- [ ] `scripts/validate-public-history.sh` reports `HISTORY_SCAN=PASS`, including
+  the generated `git archive` path scan.
+- [ ] Every reachable commit uses `FabioCamin8` and the canonical GitHub
+  noreply email for both author and committer.
+- [ ] Every release tag is annotated and uses the same canonical tagger.
 
 ## Safety and compatibility claims
 
@@ -42,3 +47,10 @@ The live VM proof additionally requires provider status/integrity,
 `hermes-health`, loopback CDP plus the Chrome MCP behavioral probe, CUA in a
 graphical session, Codex MCP initialization, and the completed documented
 post-reboot runbook.
+
+## Initial-publication history correction
+
+The initial v0.1.x Git metadata was canonicalized shortly after publication
+to replace machine-generated author and tag identities with the project's
+GitHub noreply identity. Source functionality and release intent were
+preserved. This was a one-time correction; future release tags are immutable.

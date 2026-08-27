@@ -15,6 +15,7 @@ for script in bootstrap.sh scripts/*.sh; do
   bash -n "$script"
 done
 python3 -m unittest discover -s tests -v
+tests/test_public_history.sh
 scripts/validate-public-tree.sh
 if [[ $live == true ]]; then
   [[ $(sudo -n id -u 2>/dev/null) == 0 ]] || {
