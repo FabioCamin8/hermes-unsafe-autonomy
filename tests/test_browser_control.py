@@ -372,6 +372,24 @@ class BrowserControlTests(unittest.TestCase):
         self.assertEqual(retry.classify(ActivityKind.KNOWN_SAFE_ACTIVITY), RetryState.READY)
         self.assertEqual(retry.begin_attempt("before-a"), 1)
         self.assertEqual(retry.verify(success=False, state_after="unchanged", error="no transition", evidence_key="failure-a"), RetryState.DIAGNOSE)
+        diagnostic = DiagnosticBundle(
+            "2026-08-28T00:00:00Z",
+            "fixture-matching-fingerprint",
+            "fixture",
+            "fixture.matching",
+            ActivityKind.PROTECTED_SORTABLE_MATCHING.value,
+            1,
+            "unchanged",
+            "read_only_probe",
+            "unchanged",
+            {"tag": "div", "role": "option", "focused": True},
+            True,
+            {"selected": False},
+            None,
+            "no verified transition",
+            1,
+        )
+        self.assertEqual(json.loads(diagnostic.to_json())["retry_number"], 1)
         self.assertTrue(retry.recommend_specialist())
         self.assertFalse(retry.recommend_specialist())
         self.assertEqual(retry.begin_attempt("new-dom-evidence"), 2)
