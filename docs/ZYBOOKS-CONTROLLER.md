@@ -36,8 +36,9 @@ enumerates `.interactive-activity-container` roots and reports control types,
 ARIA roles, iframe/gesture markers, completion markers, scoped Check/Submit
 counts, visibility, and structural fingerprints. It also emits
 `custom_interaction_candidate` plus structural signals for sortable/term-bank,
-roles, pointer handlers, keyboard-reorder semantics, draggable markers,
-canvas, and gesture-marked SVG. It never reads answer text,
+sortable items and containers, focusable custom items, native and non-native
+draggable markers, interaction ARIA, roles, pointer handlers,
+keyboard-reorder semantics, canvas, and gesture-marked SVG. It never reads answer text,
 input values, cookies, headers, or full HTML.
 
 `ActivityClassifier` gives protected signals precedence:
@@ -46,10 +47,17 @@ input values, cookies, headers, or full HTML.
 | --- | --- |
 | `PROTECTED_CHALLENGE` | challenge/assessment markers |
 | `PROTECTED_LAB` | zyLab/editor/grader markers |
+| `PROTECTED_SORTABLE_MATCHING` | paired sortable items and containers with a term bank or focusable `option` items |
 | `PROTECTED_DRAG_AND_DROP` | native draggable, sortable/term-bank, drag/drop roles, pointer handlers, canvas, or SVG with gesture indicators |
 | `UNKNOWN` | iframe, unsupported/custom controls, missing participation contract, or insufficient evidence |
 | `KNOWN_SAFE_ACTIVITY` | only the small recognized radio/checkbox/animation contract |
 
+The sortable subtype requires independent structure signals; a lone class or
+role marker remains generic protected drag/drop. Its diagnostic record reports
+the classification, structural signal names, native/non-native draggable
+counts, whether a keyboard contract was observed, and `mutation_allowed: false`.
+The non-native `draggable=false` count is forensic evidence, not a standalone
+classification signal.
 Protected and unknown roots cannot enter a generic handler. Every mutation
 request carries the selected target ID, page generation, activity ID, root
 fingerprint, and operation. `ProtectedContainerRegistry` rejects ambiguous

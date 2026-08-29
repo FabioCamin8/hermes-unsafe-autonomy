@@ -31,6 +31,7 @@ class TargetSelectionStatus(str, Enum):
 
 class ActivityKind(str, Enum):
     KNOWN_SAFE_ACTIVITY = "KNOWN_SAFE_ACTIVITY"
+    PROTECTED_SORTABLE_MATCHING = "PROTECTED_SORTABLE_MATCHING"
     PROTECTED_DRAG_AND_DROP = "PROTECTED_DRAG_AND_DROP"
     PROTECTED_CHALLENGE = "PROTECTED_CHALLENGE"
     PROTECTED_LAB = "PROTECTED_LAB"
@@ -273,8 +274,14 @@ class ActivityRecord:
     native_draggable_count: int = 0
     sortable_markers: tuple[str, ...] = ()
     term_bank_markers: tuple[str, ...] = ()
+    sortable_container_count: int = 0
+    sortable_item_count: int = 0
+    term_bank_container_count: int = 0
+    focusable_custom_item_count: int = 0
+    non_native_draggable_count: int = 0
     drag_drop_roles: tuple[str, ...] = ()
     pointer_markers: tuple[str, ...] = ()
+    interaction_aria_markers: tuple[str, ...] = ()
     canvas_count: int = 0
     svg_count: int = 0
     completion_markers: tuple[str, ...] = ()
@@ -292,6 +299,21 @@ class ActivityRecord:
 
     def custom_interaction_signals(self) -> tuple[str, ...]:
         signals: list[str] = []
+        if self.sortable_container_count:
+            signals.append("sortable_container")
+        if self.sortable_item_count:
+            signals.append("sortable_item")
+        if self.term_bank_container_count:
+            signals.append("term_bank")
+        if self.focusable_custom_item_count:
+            signals.append("focusable_custom_item")
+        if self.non_native_draggable_count and (
+            self.sortable_container_count
+            or self.sortable_item_count
+            or self.term_bank_container_count
+            or self.drag_drop_roles
+        ):
+            signals.append("non_native_draggable")
         if self.native_draggable_count:
             signals.append("native_draggable")
         if self.sortable_markers:
@@ -302,6 +324,8 @@ class ActivityRecord:
             signals.extend(f"role:{role}" for role in self.drag_drop_roles)
         if self.pointer_markers:
             signals.extend(f"pointer:{marker}" for marker in self.pointer_markers)
+        if self.interaction_aria_markers:
+            signals.extend(f"aria:{marker}" for marker in self.interaction_aria_markers)
         if self.keyboard_reorder_markers:
             signals.extend(f"keyboard:{marker}" for marker in self.keyboard_reorder_markers)
         if self.canvas_count:
@@ -313,6 +337,20 @@ class ActivityRecord:
     @property
     def custom_interaction_candidate(self) -> bool:
         return bool(self.custom_interaction_signals())
+
+    @property
+    def sortable_matching_candidate(self) -> bool:
+        """Require multiple independent structure signals before subtyping."""
+
+        has_option_role = any(role.lower() == "option" for role in self.drag_drop_roles)
+        has_sortable_items = self.sortable_item_count > 0
+        return has_sortable_items and (
+            self.term_bank_container_count > 0
+            or (
+                self.sortable_container_count > 0
+                and (has_option_role or self.focusable_custom_item_count > 0)
+            )
+        )
 
     def diagnostic(self) -> dict[str, Any]:
         return {
@@ -327,8 +365,14 @@ class ActivityRecord:
             "native_draggable": self.native_draggable_count,
             "sortable_markers": list(self.sortable_markers),
             "term_bank_markers": list(self.term_bank_markers),
+            "sortable_containers": self.sortable_container_count,
+            "sortable_items": self.sortable_item_count,
+            "term_bank_containers": self.term_bank_container_count,
+            "focusable_custom_items": self.focusable_custom_item_count,
+            "non_native_draggable": self.non_native_draggable_count,
             "drag_drop_roles": list(self.drag_drop_roles),
             "pointer_markers": list(self.pointer_markers),
+            "interaction_aria_markers": list(self.interaction_aria_markers),
             "keyboard_reorder_markers": list(self.keyboard_reorder_markers),
             "canvas": self.canvas_count,
             "svg": self.svg_count,
@@ -345,6 +389,11 @@ class ActivityRecord:
             "fingerprint": self.fingerprint,
             "custom_interaction_candidate": self.custom_interaction_candidate,
             "custom_interaction_signals": list(self.custom_interaction_signals()),
+            "sortable_matching_candidate": self.sortable_matching_candidate,
+            "keyboard_contract": "observed" if self.keyboard_reorder_markers else "unknown",
+            # An inventory is never an authorization decision. The registry
+            # must separately prove a safe activity and selected target.
+            "mutation_allowed": False,
         }
 
 
@@ -369,13 +418,19 @@ class ActivityClassifier:
             return ActivityKind.PROTECTED_CHALLENGE
         if record.lab_markers:
             return ActivityKind.PROTECTED_LAB
+        if record.sortable_matching_candidate:
+            return ActivityKind.PROTECTED_SORTABLE_MATCHING
         if (
             record.native_draggable_count
             or record.sortable_markers
             or record.term_bank_markers
+            or record.sortable_container_count
+            or record.sortable_item_count
             or record.drag_drop_roles
             or record.pointer_markers
+            or record.interaction_aria_markers
             or record.canvas_count
+            or record.keyboard_reorder_markers
         ):
             return ActivityKind.PROTECTED_DRAG_AND_DROP
         if record.iframe_count or not record.participation_marker:
@@ -396,7 +451,17 @@ class ActivityClassifier:
         for activity in records:
             signals = activity.custom_interaction_signals()
             if signals:
-                candidates.append({"activity_id": activity.activity_id, "signals": list(signals)})
+                classified = activity.with_kind(self.classify(activity))
+                candidates.append(
+                    {
+                        "activity_id": activity.activity_id,
+                        "classification": classified.kind.value,
+                        "signals": list(signals),
+                        "native_draggable": activity.native_draggable_count,
+                        "keyboard_contract": "observed" if activity.keyboard_reorder_markers else "unknown",
+                        "mutation_allowed": False,
+                    }
+                )
         return tuple(candidates)
 
 

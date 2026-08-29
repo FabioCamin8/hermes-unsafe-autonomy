@@ -46,6 +46,21 @@ def record(index: int = 1, **overrides: object) -> ActivityRecord:
     return ActivityRecord(**values)
 
 
+def sortable_fixture_record() -> ActivityRecord:
+    return record(
+        activity_id="fixture.matching",
+        section="fixture",
+        fingerprint="fixture-matching-fingerprint",
+        sortable_container_count=3,
+        sortable_item_count=2,
+        term_bank_container_count=1,
+        focusable_custom_item_count=2,
+        non_native_draggable_count=2,
+        drag_drop_roles=("option",),
+        keyboard_reorder_markers=("keyboard_focusable_reorder",),
+    )
+
+
 class Root:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -163,6 +178,41 @@ class BrowserControlTests(unittest.TestCase):
         activity = record(sortable_markers=("sortable_marker",), term_bank_markers=("term_bank_marker",))
         self.assertEqual(ActivityClassifier().classify(activity), ActivityKind.PROTECTED_DRAG_AND_DROP)
 
+    def test_historical_sortable_fixture_gets_specific_protected_classification(self) -> None:
+        fixture = (Path(__file__).parent / "fixtures" / "sanitized_matching_widget.html").read_text(encoding="utf-8")
+        for marker in (
+            'class="zb-sortable-container term-bank"',
+            'class="zb-sortable-item definition-match-term"',
+            'role="option"',
+            'tabindex="0"',
+            'draggable="false"',
+        ):
+            self.assertIn(marker, fixture)
+
+        classified = ActivityClassifier().inventory([sortable_fixture_record()])[0]
+        self.assertEqual(classified.kind, ActivityKind.PROTECTED_SORTABLE_MATCHING)
+        diagnostic = classified.diagnostic()
+        self.assertEqual(diagnostic["custom_interaction_signals"][:4], [
+            "sortable_container",
+            "sortable_item",
+            "term_bank",
+            "focusable_custom_item",
+        ])
+        self.assertEqual(diagnostic["non_native_draggable"], 2)
+        self.assertEqual(diagnostic["keyboard_contract"], "observed")
+        self.assertFalse(diagnostic["mutation_allowed"])
+        self.assertNotIn("ITEM_A", json.dumps(diagnostic))
+
+    def test_sortable_markers_without_matching_structure_remain_generic_protected(self) -> None:
+        activity = record(sortable_container_count=1, sortable_item_count=1)
+        self.assertEqual(ActivityClassifier().classify(activity), ActivityKind.PROTECTED_DRAG_AND_DROP)
+
+    def test_non_native_draggable_marker_alone_is_not_a_custom_signal(self) -> None:
+        activity = record(non_native_draggable_count=3)
+        self.assertEqual(ActivityClassifier().classify(activity), ActivityKind.KNOWN_SAFE_ACTIVITY)
+        self.assertEqual(ActivityClassifier().custom_interaction_candidates([activity]), ())
+        self.assertEqual(activity.diagnostic()["non_native_draggable"], 3)
+
     def test_custom_interaction_candidates_are_read_only(self) -> None:
         activity = record(
             drag_drop_roles=("option",),
@@ -170,8 +220,10 @@ class BrowserControlTests(unittest.TestCase):
         )
         candidates = ActivityClassifier().custom_interaction_candidates([activity])
         self.assertEqual(candidates[0]["activity_id"], "2.5.1")
+        self.assertEqual(candidates[0]["classification"], ActivityKind.PROTECTED_DRAG_AND_DROP.value)
         self.assertIn("role:option", candidates[0]["signals"])
         self.assertIn("keyboard:keyboard_focusable_reorder", candidates[0]["signals"])
+        self.assertFalse(candidates[0]["mutation_allowed"])
 
     def test_decorative_svg_does_not_imply_gesture_control(self) -> None:
         self.assertEqual(ActivityClassifier().classify(record(svg_count=3)), ActivityKind.KNOWN_SAFE_ACTIVITY)
@@ -211,6 +263,56 @@ class BrowserControlTests(unittest.TestCase):
         self.assertTrue(decision.allowed)
         self.assertEqual(selected, ["A:button.check-button"])
         self.assertEqual(roots["2.5.2"].node.queries, [])
+
+    def test_sanitized_sortable_fixture_isolated_from_global_mutation_paths(self) -> None:
+        fixture = (Path(__file__).parent / "fixtures" / "sanitized_matching_widget.html").read_text(encoding="utf-8")
+        self.assertIn("check-button", fixture)
+        self.assertIn("submit-button", fixture)
+
+        candidate = TargetCandidate("fixture-target", "https://example.test/fixture")
+        registry = ProtectedContainerRegistry(TargetSelector().select([candidate]))
+        protected = sortable_fixture_record()
+        safe = record(2, activity_id="fixture.safe", section="fixture")
+        registry.bind("fixture-target", 1, [protected, safe])
+        protected_root = Root("protected")
+        safe_root = Root("safe")
+        roots = {protected.activity_id: ActivityRoot(protected.activity_id, protected.fingerprint, protected_root), safe.activity_id: ActivityRoot(safe.activity_id, safe.fingerprint, safe_root)}
+        root_lookups: list[str] = []
+        mutations: list[str] = []
+        started_resource_owners: list[str] = []
+        protected_snapshot = protected.diagnostic()
+
+        def root_lookup(activity_id: str) -> ActivityRoot:
+            root_lookups.append(activity_id)
+            return roots[activity_id]
+
+        def process_safe(scope: object) -> None:
+            mutations.append(scope.query_selector("button.check-button"))  # type: ignore[attr-defined]
+            started_resource_owners.append(safe.activity_id)
+
+        protected_request = MutationRequest("fixture-target", 1, protected.activity_id, protected.fingerprint, "protected_probe")
+        decision = registry.perform(protected_request, root_lookup, process_safe)
+        self.assertEqual(decision.code, "PROTECTED_ACTIVITY")
+        self.assertFalse(decision.allowed)
+        self.assertEqual(root_lookups, [])
+        self.assertEqual(protected_root.queries, [])
+        self.assertEqual(mutations, [])
+        self.assertEqual(started_resource_owners, [])
+        self.assertEqual(protected.diagnostic(), protected_snapshot)
+
+        safe_request = MutationRequest("fixture-target", 1, safe.activity_id, safe.fingerprint, "safe_probe")
+        decision = registry.perform(safe_request, root_lookup, process_safe)
+        self.assertTrue(decision.allowed)
+        self.assertEqual(root_lookups, [safe.activity_id])
+        self.assertEqual(safe_root.queries, ["button.check-button"])
+        self.assertEqual(mutations, ["safe:button.check-button"])
+        self.assertEqual(started_resource_owners, [safe.activity_id])
+
+        safe_resources = ActivityResources("fixture-target", safe.activity_id, 1)
+        safe_timer = OwnedTimer("fixture-target", safe.activity_id, 1, deadline=100.0)
+        safe_resources.add(safe_timer)
+        self.assertEqual([(resource.activity_id, resource.state.value) for resource in safe_resources.resources], [(safe.activity_id, "ACTIVE")])
+        self.assertEqual(protected_root.queries, [])
 
     def test_adapter_cannot_swap_activity_roots(self) -> None:
         candidate = TargetCandidate("tab-a", "https://learn.zybooks.com/zybook/course/chapter/2/section/5")
@@ -270,6 +372,8 @@ class BrowserControlTests(unittest.TestCase):
         self.assertEqual(retry.classify(ActivityKind.KNOWN_SAFE_ACTIVITY), RetryState.READY)
         self.assertEqual(retry.begin_attempt("before-a"), 1)
         self.assertEqual(retry.verify(success=False, state_after="unchanged", error="no transition", evidence_key="failure-a"), RetryState.DIAGNOSE)
+        self.assertTrue(retry.recommend_specialist())
+        self.assertFalse(retry.recommend_specialist())
         self.assertEqual(retry.begin_attempt("new-dom-evidence"), 2)
         self.assertEqual(retry.verify(success=False, state_after="unchanged", error="no transition", evidence_key="failure-b"), RetryState.BLOCKED)
         with self.assertRaises(RuntimeError):
@@ -367,6 +471,8 @@ class BrowserControlTests(unittest.TestCase):
     def test_observer_is_not_a_solver_or_global_mutator(self) -> None:
         observer = (Path(__file__).parents[1] / "browser_control" / "observer.js").read_text(encoding="utf-8")
         self.assertNotIn(".click(", observer)
+        self.assertNotIn(".dispatchEvent(", observer)
+        self.assertNotIn("document.querySelector(\"button.check-button\")", observer)
         self.assertNotIn("innerText", observer)
         self.assertNotIn(".value", observer)
         self.assertNotIn("setInterval", observer)

@@ -12,7 +12,7 @@
   "use strict";
 
   const RUNTIME_KEY = "__zybooksDeterministicObserver";
-  const RUNTIME_VERSION = 3;
+  const RUNTIME_VERSION = 4;
   const SAFE_ACTIVITY_CONTROLS = new Set([
     "radio",
     "checkbox",
@@ -135,12 +135,34 @@
       .toLowerCase();
   }
 
-  function keyboardReorderMarkers(root, source) {
+  function countMatching(root, selector) {
+    return (root.matches(selector) ? 1 : 0) + root.querySelectorAll(selector).length;
+  }
+
+  function interactionAriaMarkers(root) {
+    const markers = [];
+    if (root.querySelector("[aria-grabbed]")) markers.push("aria_grabbed");
+    if (root.querySelector("[aria-dropeffect]")) markers.push("aria_dropeffect");
+    if (root.querySelector("[aria-keyshortcuts]")) markers.push("aria_keyshortcuts");
+    return markers;
+  }
+
+  function keyboardReorderMarkers(root, source, structure) {
     const markers = [];
     if (root.querySelector("[aria-grabbed], [aria-dropeffect], [aria-keyshortcuts]")) markers.push("aria_reorder_semantics");
     if (root.querySelector("[onkeydown], [onkeyup]")) markers.push("keyboard_handler");
-    if (/reorder|sortable|drag|drop|matching/.test(source) && root.querySelector("[role='option'], [tabindex]")) markers.push("keyboard_focusable_reorder");
+    if (structure.focusable_custom_item_count > 0 && (structure.sortable_item_count > 0 || structure.term_bank_container_count > 0 || /reorder|sortable|drag|drop|matching/.test(source))) {
+      markers.push("keyboard_focusable_reorder");
+    }
     return markers;
+  }
+
+  function sortableMatchingCandidate(record) {
+    const hasOptionRole = record.drag_drop_roles.some((role) => role.toLowerCase() === "option");
+    return record.sortable_items > 0 && (
+      record.term_bank_containers > 0 ||
+      (record.sortable_containers > 0 && (hasOptionRole || record.focusable_custom_items > 0))
+    );
   }
 
   function completionMarkers(root) {
@@ -167,12 +189,14 @@
   function classify(record) {
     if (record.challenge_markers.length) return { kind: "PROTECTED_CHALLENGE", protected: true, reason: record.challenge_markers[0] };
     if (record.lab_markers.length) return { kind: "PROTECTED_LAB", protected: true, reason: record.lab_markers[0] };
+    if (record.sortable_matching_candidate) return { kind: "PROTECTED_SORTABLE_MATCHING", protected: true, reason: "paired_sortable_matching_structure" };
     if (
       record.native_draggable > 0 ||
       record.sortable_markers.length ||
       record.term_bank_markers.length ||
       record.drag_drop_roles.length ||
       record.pointer_markers.length ||
+      record.interaction_aria_markers.length ||
       record.canvas > 0 ||
       record.keyboard_reorder_markers.length
     ) return { kind: "PROTECTED_DRAG_AND_DROP", protected: true, reason: "gesture_or_sortable_signal" };
@@ -188,13 +212,27 @@
     const source = structuralSource(root);
     const challengeMarkers = source.match(/challenge|assessment|quiz/) ? ["challenge_marker"] : [];
     const labMarkers = source.match(/zylab|editor|grader|code-editor|codemirror|monaco/) ? ["lab_or_editor_marker"] : [];
-    const sortableMarkers = source.match(/sortable|drag-item|drop-target|matching/) ? ["sortable_marker"] : [];
-    const termBankMarkers = source.match(/term-bank|termbank/) ? ["term_bank_marker"] : [];
+    const sortableContainers = countMatching(root, ".zb-sortable-container, [class*='sortable-container']");
+    const sortableItems = countMatching(root, ".zb-sortable-item, [class*='sortable-item'], .definition-match-term");
+    const termBankContainers = countMatching(root, ".term-bank, [class*='term-bank'], [class*='termbank']");
+    const focusableCustomItems = countMatching(root, "[role='option'][tabindex], .zb-sortable-item[tabindex], .definition-match-term[tabindex]");
+    const nonNativeDraggable = countMatching(root, "[draggable='false'], [draggable=false]");
+    const sortableMarkers = [];
+    if (sortableContainers > 0) sortableMarkers.push("sortable_container");
+    if (sortableItems > 0) sortableMarkers.push("sortable_item");
+    if (/drop-target/.test(source)) sortableMarkers.push("drop_target_marker");
+    if (/matching/.test(source)) sortableMarkers.push("matching_marker");
+    const termBankMarkers = termBankContainers > 0 ? ["term_bank"] : [];
     const dragDropRoles = roles(root).filter((role) => /drag|drop|option/i.test(role));
     const pointerMarkers = [];
     if (root.querySelector("[draggable='true'], [draggable=true]")) pointerMarkers.push("native_draggable");
     if (root.querySelector("[style*='cursor: grab'], [onpointerdown], [ontouchstart], [onmousedown]")) pointerMarkers.push("pointer_handler");
-    const keyboardMarkers = keyboardReorderMarkers(root, source);
+    const ariaMarkers = interactionAriaMarkers(root);
+    const keyboardMarkers = keyboardReorderMarkers(root, source, {
+      sortable_item_count: sortableItems,
+      term_bank_container_count: termBankContainers,
+      focusable_custom_item_count: focusableCustomItems,
+    });
     const check = controlState(root, "button.check-button");
     const submit = controlState(root, "button.submit-button, button[type='submit']");
     const controls = controlTypes(root);
@@ -215,8 +253,14 @@
       native_draggable: root.querySelectorAll("[draggable='true'], [draggable=true]").length,
       sortable_markers: sortableMarkers,
       term_bank_markers: termBankMarkers,
+      sortable_containers: sortableContainers,
+      sortable_items: sortableItems,
+      term_bank_containers: termBankContainers,
+      focusable_custom_items: focusableCustomItems,
+      non_native_draggable: nonNativeDraggable,
       drag_drop_roles: dragDropRoles,
       pointer_markers: pointerMarkers,
+      interaction_aria_markers: ariaMarkers,
       keyboard_reorder_markers: keyboardMarkers,
       canvas: root.querySelectorAll("canvas").length,
       svg: root.querySelectorAll("svg").length,
@@ -226,13 +270,20 @@
       visible: visible(root),
       fingerprint: structuralFingerprint(root),
     };
+    record.sortable_matching_candidate = sortableMatchingCandidate(record);
     const classification = classify(record);
     const customSignals = [];
+    if (record.sortable_containers > 0) customSignals.push("sortable_container");
+    if (record.sortable_items > 0) customSignals.push("sortable_item");
+    if (record.term_bank_containers > 0) customSignals.push("term_bank");
+    if (record.focusable_custom_items > 0) customSignals.push("focusable_custom_item");
+    if (record.non_native_draggable > 0 && (record.sortable_containers > 0 || record.sortable_items > 0 || record.term_bank_containers > 0 || record.drag_drop_roles.length > 0)) customSignals.push("non_native_draggable");
     if (record.native_draggable > 0) customSignals.push("native_draggable");
     for (const marker of record.sortable_markers) customSignals.push(`sortable:${marker}`);
     for (const marker of record.term_bank_markers) customSignals.push(`term_bank:${marker}`);
     for (const role of record.drag_drop_roles) customSignals.push(`role:${role}`);
     for (const marker of record.pointer_markers) customSignals.push(`pointer:${marker}`);
+    for (const marker of record.interaction_aria_markers) customSignals.push(`aria:${marker}`);
     for (const marker of record.keyboard_reorder_markers) customSignals.push(`keyboard:${marker}`);
     if (record.canvas > 0) customSignals.push("canvas");
     if (record.svg > 0 && (record.pointer_markers.length || record.keyboard_reorder_markers.length)) customSignals.push("svg_gesture");
